@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lëtzebuergesch Sprooch AI - Chatbot mat Stemm</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .chat-header {
+            background: #0066cc;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+            position: relative;
+        }
+        .user-message {
+            background: #0066cc;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .ai-message {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .chat-input {
+            display: flex;
+            padding: 20px;
+            border-top: 1px solid #ddd;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .speak-btn {
+            background: #28a745;
+            padding: 5px 10px;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .speak-btn:hover {
+            background: #218838;
+        }
+        .speak-btn-inline {
+            position: absolute;
+            right: 5px;
+            top: 5px;
+            padding: 2px 6px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Hei! Ech si Äre Lëtzebuergesch AI-Assistent</h1>
+            <p>Schreift op Englesch oder Lëtzebuergesch – ech äntweren op Lëtzebuergesch! Mat Stemm-Support an Daten vun RTL.lu a LOD.lu.</p>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message ai-message">
+                Bonjour! Wéi kann ech Iech hëllefen? Fro mech iwwer Wierder (via LOD.lu), Nuesen (via RTL.lu), Lëtzebuerg, oder aner Themen. Klickt op d'Stëmmsymbol fir ze héieren!
+                <button class="speak-btn speak-btn-inline" onclick="speakMessage(this.previousSibling.textContent)">:loud_sound:</button>
+            </div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="userInput" placeholder="Är Fro hei..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">Schécken</button>
+            <button class="speak-btn" onclick="speakLastMessage()" title="Stëmm vun der leschter Äntwert">:loud_sound: Lescht</button>
+        </div>
+    </div>
+    <script>
+        // Simple demo responses in Luxembourgish (expand as needed)
+        const demoResponses = {
+            'hello': 'Hallo! Wéi geet et Iech?',
+            'how are you': 'Et geet gutt, merci! An Iech?',
+            'luxembourg': 'Lëtzebuerg ass e klengen, mä wonnerschéinen Héngerdall tëschent dräi Länner. D\'Kapital ass Lëtzebuerg-Stad.',
+            'language': 'Lëtzebuergesch ass eng germanesch Sprooch, déi zu Lëtzebuerg geschwat gëtt. Et ass déi nationale Sprooch.',
+            'default': 'Interessant Fro! Erzielt méi, fir datt ech besser hëllefe kann. :blush:'
+        };
+        let lastAIMessage = '';
+        // Function to add message to chat
+        function addMessage(text, isUser) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+            const speakHtml = isUser ? '' : `<button class="speak-btn speak-btn-inline" onclick="speakMessage('${text.replace(/'/g, "\\'")}')">:loud_sound:</button>`;
+            messageDiv.innerHTML = text + speakHtml;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            if (!isUser) lastAIMessage = text;
+        }
+        // Speak function
+        function speakMessage(text) {
+            if ('speechSynthesis' in window) {
+                // Cancel any ongoing speech
+                speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'lb-LU'; // Luxembourgish; fallback to 'de-DE' if not available
+                utterance.rate = 0.9;
+                utterance.volume = 1;
+                speechSynthesis.speak(utterance);
+            } else {
+                alert('Är Browser ënnerstëtzt keng Stëmm-Synthese. Probéiert Chrome oder Firefox.');
+            }
+        }
+        function speakLastMessage() {
+            if (lastAIMessage) speakMessage(lastAIMessage);
+        }
+        // Fetch from LOD API for word definition
+        async function getWordDefinition(word) {
+            try {
+                const response = await fetch(`https://lod.lu/api/lb/advanced-search?query=${encodeURIComponent(word)}&limit=1`);
+                if (!response.ok) throw new Error('API Error');
+                const data = await response.json();
+                if (data.results && data.results.length > 0) {
+                    const entry = data.results[0];
+                    return `Definitioun vun "${word}": ${entry.definition || entry.meaning || 'Keng Detailer fonnt.'} (Quell: LOD.lu)`;
+                }
+                return `Keng Definitioun fonnt fir "${word}" am LOD.lu. Probéiert en anert Wuert!`;
+            } catch (error) {
+                console.error('LOD API Error:', error);
+                return `Problem beim Opmaache vum LOD.lu: ${error.message}.`;
+            }
+        }
+        // Fetch latest news from RTL.lu RSS
+        async function getLatestNews() {
+            try {
+                const response = await fetch('https://www.rtl.lu/rss/headlines');
+                const text = await response.text();
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(text, 'text/xml');
+                const items = xml.querySelectorAll('item');
+                let news = 'Lescht Nuesen vun RTL.lu:\n';
+                for (let i = 0; i < Math.min(3, items.length); i++) {
+                    const title = items[i].querySelector('title').textContent;
+                    const link = items[i].querySelector('link').textContent;
+                    news += `- ${title} <a href="${link}" target="_blank">Link</a>\n`;
+                }
+                return news || 'Keng Nuesen fonnt.';
+            } catch (error) {
+                console.error('RSS Error:', error);
+                return 'Problem beim Luede vun den Nuesen vu RTL.lu. Probéiert et spéider!';
+            }
+        }
+        // Simulated AI response with integrations
+        async function getAIResponse(userMessage) {
+            const lowerMsg = userMessage.toLowerCase();
+            // Word definition check
+            if (lowerMsg.includes('what is ') || lowerMsg.includes('meaning of ') || lowerMsg.includes('definitioun ')) {
+                const wordMatch = lowerMsg.match(/\b(?:what is|meaning of|definitioun)\s+([a-zA-ZäéêëïîôûüÿÄÉÈËÏÔÛŸ]+)/i);
+                if (wordMatch) {
+                    return await getWordDefinition(wordMatch[1]);
+                }
+            }
+            // News check
+            if (lowerMsg.includes('news') || lowerMsg.includes('nues') || lowerMsg.includes('rtl')) {
+                return await getLatestNews();
+            }
+            // Demo keyword matching
+            let response = demoResponses.default;
+            for (let key in demoResponses) {
+                if (lowerMsg.includes(key)) {
+                    response = demoResponses[key];
+                    break;
+                }
+            }
+            return response;
+        }
+        // Real AI integration (uncomment for GPT-powered responses)
+        /*
+        async function getAIResponse(userMessage) {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message ai-message loading';
+            loadingDiv.textContent = 'Denken...';
+            document.getElementById('chatMessages').appendChild(loadingDiv);
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+            let context = '';
+            // Add LOD/RTL context if relevant
+            // e.g., if (wordMatch) context = await getWordDefinition(...);
+            try {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer YOUR_OPENAI_API_KEY_HERE'
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-3.5-turbo',
+                        messages: [
+                            { role: 'system', content: `Du bass en hilfrechen AI-Assistent op Lëtzebuergesch. Benotz dës Kontext: ${context}. Äntwert kuerz a frësch.` },
+                            { role: 'user', content: userMessage }
+                        ],
+                        max_tokens: 150
+                    })
+                });
+                const data = await response.json();
+                const aiText = data.choices[0].message.content;
+                loadingDiv.remove();
+                return aiText;
+            } catch (error) {
+                loadingDiv.remove();
+                return 'Ech hunn e Problem – probéiert et nach eemol!';
+            }
+        }
+        */
+        // Send message
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const userMessage = input.value.trim();
+            if (!userMessage) return;
+            addMessage(userMessage, true);
+            input.value = '';
+            const aiResponse = await getAIResponse(userMessage);
+            addMessage(aiResponse, false);
+        }
+    </script>
+</body>
+</html>
